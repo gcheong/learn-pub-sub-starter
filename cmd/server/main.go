@@ -3,29 +3,80 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
-    amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/gcheong/learn-pub-sub-starter/internal/pubsub"
+	"github.com/gcheong/learn-pub-sub-starter/internal/routing"
+	"github.com/gcheong/learn-pub-sub-starter/internal/gamelogic"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
-	fmt.Println("Starting Peril server...")
-	connectionStr := "amqp://guest:guest@localhost:5672/"
-	connection, error := amqp.Dial(connectionStr)
 
-	if error != nil {
-		log.Fatalf("could not connect to RabbitMQ: %v", error)
+	const rabbitConnString = "amqp://guest:guest@localhost:5672/"
+
+	conn, err := amqp.Dial(rabbitConnString)
+	if err != nil {
+		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
-
-	defer connection.Close()
-
+	defer conn.Close()
 	fmt.Println("Peril game server connected to RabbitMQ!")
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
+	publishCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("could not create channel: %v", err)
+	}
 
-	fmt.Println("RabbitMQ connection closed.")
+	gamelogic.PrintServerHelp()
+
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		if words[0]  == "pause" {
+			log.Printf("Sending Pause message!")
+
+			err = pubsub.PublishJSON(
+				publishCh,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{IsPaused: true,},
+			)
+
+			if err != nil {
+				log.Printf("could not publish message: %v", err)
+			}
+	
+
+		}
+
+
+		if words[0]  == "resume" {
+			log.Printf("Sending Resume message!")
+
+			err = pubsub.PublishJSON(
+				publishCh,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{IsPaused: false,},
+			)
+
+			if err != nil {
+			log.Printf("could not publish message: %v", err)
+			}
+	
+
+		}
+
+
+		if words[0]  == "quit" {
+			log.Printf("Exiting!")	
+			break;
+		}
+
+		log.Printf("Sorry, I don't understand that command: %s", words[0])
+		continue
+	}
 
 }
