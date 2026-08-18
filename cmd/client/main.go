@@ -2,9 +2,6 @@ package main
 
 import ("fmt"
 		"log"
-		"os"
-    	"os/signal"
-    	"syscall"
 
 		amqp "github.com/rabbitmq/amqp091-go"
 
@@ -36,14 +33,66 @@ func main() {
 	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey , pubsub.QueueTypeTransient)
 
 	if err != nil {
-		log.Fatalf("Could bind queue: %v", err)
+		log.Fatalf("Couldn't bind queue: %v", err)
 	}
 
-	//Wait for ctrl-c
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
-	<-signalChan
-	fmt.Println("Signal received, shutting down...")
+	gamestate := gamelogic.NewGameState(username)
+
+	for {
+
+		words := gamelogic.GetInput()
+		
+		if len(words) == 0 {
+			continue
+		}
+
+		command := words[0]
+
+		if command == "spawn" {
+			err := gamestate.CommandSpawn(words)
+			if err != nil {
+				fmt.Printf("%v",err)
+			}
+			continue
+		}
+
+		if command == "move" {
+			_, err := gamestate.CommandMove(words)
+
+			if err != nil {
+				fmt.Printf("%v",err)
+			} else {
+				fmt.Printf("Move successful")
+			}
+
+			continue
+
+		}
+
+		if command == "status" {
+			gamestate.CommandStatus()
+			continue
+		}
+
+		if command == "help" {
+			gamelogic.PrintClientHelp()
+			continue
+		}
+
+		if command == "spam" {
+			fmt.Println("Spamming not allowed yet!")
+			continue
+		}
+
+		if command == "quit" {
+			fmt.Println("Exiting client...")
+			break
+		}
+
+		fmt.Printf("Unrecognized command: %s", command)
+		continue
+
+	}
 
 
 }
