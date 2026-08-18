@@ -51,6 +51,7 @@ func main() {
 				log.Printf("could not publish message: %v", err)
 			}
 	
+			continue
 
 		}
 
@@ -69,6 +70,7 @@ func main() {
 			log.Printf("could not publish message: %v", err)
 			}
 	
+			continue
 
 		}
 
@@ -79,7 +81,6 @@ func main() {
 		}
 
 		log.Printf("Sorry, I don't understand that command: %s", words[0])
-		continue
 	}
 
 }

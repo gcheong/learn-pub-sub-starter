@@ -50,13 +50,13 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 }
 
 func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType,  handler func(T)) error {
-	chann, queue, err := DeclareAndBind(conn, exchange, queueName, keu, queueType)
+	chann, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	
 	if err != nil {
 		return err
 	}
 
-	delivery, err := chann.Consume(queue, "", false, false, false, false, nil)
+	delivery, err := chann.Consume(queue.Name, "", false, false, false, false, nil)
 
 	go func() {
     	for message := range delivery {
@@ -69,10 +69,13 @@ func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key strin
 			}
 
 			handler(result)
+
+			message.Ack(false)
     	}
 	}()	
 
 
+	return nil
 
 }
 

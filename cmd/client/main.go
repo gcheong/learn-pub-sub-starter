@@ -10,6 +10,12 @@ import ("fmt"
 		"github.com/gcheong/learn-pub-sub-starter/internal/pubsub"
 )
 
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState){
+		defer fmt.Print(">")
+		gs.HandlePause(ps)
+	}
+}
 func main() {
 	fmt.Println("Starting Peril client...")
 
@@ -28,15 +34,19 @@ func main() {
 		log.Fatalf("Could not get username: %v", err)
 	}
 
+	gameState := gamelogic.NewGameState(username)
+
 	queueName := routing.PauseKey + "." + username
 
-	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey , pubsub.QueueTypeTransient)
+	// _, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey , pubsub.QueueTypeTransient)
+
+	pubsub.SubscribeJSON(conn,routing.ExchangePerilDirect, queueName, routing.PauseKey,pubsub.QueueTypeTransient, handlerPause(gameState) )
 
 	if err != nil {
 		log.Fatalf("Couldn't bind queue: %v", err)
 	}
 
-	gamestate := gamelogic.NewGameState(username)
+	
 
 	for {
 
@@ -49,7 +59,7 @@ func main() {
 		command := words[0]
 
 		if command == "spawn" {
-			err := gamestate.CommandSpawn(words)
+			err := gameState.CommandSpawn(words)
 			if err != nil {
 				fmt.Printf("%v",err)
 			}
@@ -57,7 +67,7 @@ func main() {
 		}
 
 		if command == "move" {
-			_, err := gamestate.CommandMove(words)
+			_, err := gameState.CommandMove(words)
 
 			if err != nil {
 				fmt.Printf("%v",err)
@@ -70,7 +80,7 @@ func main() {
 		}
 
 		if command == "status" {
-			gamestate.CommandStatus()
+			gameState.CommandStatus()
 			continue
 		}
 
