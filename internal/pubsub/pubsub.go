@@ -16,6 +16,14 @@ const (
 	QueueTypeTransient SimpleQueueType = "transient"
 )
 
+type AckType string
+
+const (
+	AckTypeAck AckType = "Ack"
+	AckTypeNackRequeue AckType = "NackRequeue"
+	AckTypeNackDiscard AckType = "AckTypeDiscard"
+)
+
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	//Marshall val to json
 	data, err := json.Marshal(val)
@@ -47,7 +55,7 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 
 }
 
-func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType,  handler func(T)) error {
+func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType,  handler func(T) AckType) error {
 	chann, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	
 	if err != nil {
@@ -66,9 +74,23 @@ func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key strin
 				continue
 			}
 
-			handler(result)
+			ackType := handler(result)
 
-			message.Ack(false)
+			if ackType == AckTypeAck {
+				message.Ack(false)
+				log.Printf("Acktype: %s", ackType)
+			}
+
+			if ackType == AckTypeNackRequeue {
+				message.Nack(false,true)
+				log.Printf("Acktype: %s", ackType)
+			}
+
+			if ackType == AckTypeNackDiscard {
+				message.Nack(false,false)
+				log.Printf("Acktype: %s", ackType)
+			}
+			
     	}
 	}()	
 

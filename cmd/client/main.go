@@ -10,17 +10,24 @@ import ("fmt"
 		"github.com/gcheong/learn-pub-sub-starter/internal/pubsub"
 )
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(ps routing.PlayingState){
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.AckType {
+	return func(ps routing.PlayingState) pubsub.AckType {
 		defer fmt.Print(">")
 		gs.HandlePause(ps)
+		return "Ack"
 	}
 }
 
-func handlerMove(gs *gamelogic.GameState) func(mv gamelogic.ArmyMove){
-	return func(mv gamelogic.ArmyMove){
+func handlerMove(gs *gamelogic.GameState) func(mv gamelogic.ArmyMove) pubsub.AckType{
+	return func(mv gamelogic.ArmyMove) pubsub.AckType {
 		defer fmt.Print(">")
-		gs.HandleMove(mv)
+		outcome := gs.HandleMove(mv)
+
+		if outcome == gamelogic.MoveOutComeSafe || outcome == gamelogic.MoveOutcomeMakeWar {
+			return pubsub.AckTypeAck
+		}
+
+		return pubsub.AckTypeNackDiscard
 	}
 }
 
