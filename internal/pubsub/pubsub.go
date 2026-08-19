@@ -7,8 +7,6 @@ import (
 	 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/gcheong/learn-pub-sub-starter/internal/routing"
-
 )
 
 type SimpleQueueType string
@@ -43,7 +41,7 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 		return chann, queue, err
 	}
 
-	err = chann.QueueBind(queueName, routing.PauseKey, routing.ExchangePerilDirect, false, nil)
+	err = chann.QueueBind(queueName, key, exchange, false, nil)
 
 	return chann, queue, err
 

@@ -16,6 +16,14 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 		gs.HandlePause(ps)
 	}
 }
+
+func handlerMove(gs *gamelogic.GameState) func(mv gamelogic.ArmyMove){
+	return func(mv gamelogic.ArmyMove){
+		defer fmt.Print(">")
+		gs.HandleMove(mv)
+	}
+}
+
 func main() {
 	fmt.Println("Starting Peril client...")
 
@@ -40,11 +48,19 @@ func main() {
 
 	// _, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey , pubsub.QueueTypeTransient)
 
-	pubsub.SubscribeJSON(conn,routing.ExchangePerilDirect, queueName, routing.PauseKey,pubsub.QueueTypeTransient, handlerPause(gameState) )
-
+	
+	err = pubsub.SubscribeJSON(conn,routing.ExchangePerilDirect, queueName, routing.PauseKey,pubsub.QueueTypeTransient, handlerPause(gameState) )
 	if err != nil {
 		log.Fatalf("Couldn't bind queue: %v", err)
 	}
+
+	movesQueueName := "army_moves." + username
+
+	err = pubsub.SubscribeJSON(conn,routing.ExchangePerilTopic, movesQueueName, "army_moves.*", pubsub.QueueTypeTransient, handlerMove(gameState) )
+	if err != nil {
+		log.Fatalf("Couldn't bind queue: %v", err)
+	}
+	
 
 	
 
@@ -67,15 +83,30 @@ func main() {
 		}
 
 		if command == "move" {
-			_, err := gameState.CommandMove(words)
+			mv, err := gameState.CommandMove(words)
 
 			if err != nil {
 				fmt.Printf("%v",err)
+
 			} else {
-				fmt.Printf("Move successful")
+				fmt.Println("Move successful")
+				publishCh, err := conn.Channel()
+				err = pubsub.PublishJSON(
+					publishCh,
+					routing.ExchangePerilTopic,
+					movesQueueName,
+					mv,
+				)
+
+				if err != nil {
+					log.Printf("Could not publish message: %v", err)
+				} else {
+					log.Printf("Move published! %v to queue: %s", mv, movesQueueName)
+				}
 			}
 
 			continue
+
 
 		}
 
