@@ -43,7 +43,7 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 		return chann, amqp.Queue{}, err
 	}
 
-	queue, err := chann.QueueDeclare(queueName, queueType == QueueTypeDurable, queueType == QueueTypeTransient, queueType == QueueTypeTransient, false, nil)
+	queue, err := chann.QueueDeclare(queueName, queueType == QueueTypeDurable, queueType == QueueTypeTransient, queueType == QueueTypeTransient, false, amqp.Table{ "x-dead-letter-exchange" : "peril_dlx" } )
 
 	if err != nil {
 		return chann, queue, err
