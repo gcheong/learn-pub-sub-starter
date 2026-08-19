@@ -18,16 +18,58 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Ack
 	}
 }
 
-func handlerMove(gs *gamelogic.GameState) func(mv gamelogic.ArmyMove) pubsub.AckType{
+func handlerMove(gs *gamelogic.GameState, chann *amqp.Channel) func(mv gamelogic.ArmyMove) pubsub.AckType{
 	return func(mv gamelogic.ArmyMove) pubsub.AckType {
 		defer fmt.Print(">")
 		outcome := gs.HandleMove(mv)
 
-		if outcome == gamelogic.MoveOutComeSafe || outcome == gamelogic.MoveOutcomeMakeWar {
+		if outcome == gamelogic.MoveOutComeSafe{
+			return pubsub.AckTypeAck
+		}
+
+		if outcome == gamelogic.MoveOutcomeMakeWar {
+			routingKey := routing.WarRecognitionsPrefix + "." + mv.Player.Username
+			err := pubsub.PublishJSON(
+					chann,
+					routing.ExchangePerilTopic,
+					routingKey,
+					gamelogic.RecognitionOfWar{
+  					 	Attacker: mv.Player,
+   						Defender: gs.GetPlayerSnap(),
+					},
+			)
+
+			if err != nil {
+				log.Printf("handlerMove: Could not publish war acknowledge message: %v", err)
+				return pubsub.AckTypeNackRequeue
+			}
+
 			return pubsub.AckTypeAck
 		}
 
 		return pubsub.AckTypeNackDiscard
+	}
+}
+
+func handlerWar(gs *gamelogic.GameState) func(msg gamelogic.RecognitionOfWar) pubsub.AckType {
+	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
+		defer fmt.Print(">")
+		
+		outcome, _, _ := gs.HandleWar(rw)
+
+		switch outcome {
+			case gamelogic.WarOutcomeNotInvolved:
+				return pubsub.AckTypeNackRequeue
+			case gamelogic.WarOutcomeNoUnits:
+				return pubsub.AckTypeNackDiscard
+			case gamelogic.WarOutcomeOpponentWon, gamelogic.WarOutcomeYouWon, gamelogic.WarOutcomeDraw:
+				return pubsub.AckTypeAck
+			default:
+				return pubsub.AckTypeNackDiscard
+				
+		}
+
+		
 	}
 }
 
@@ -63,7 +105,20 @@ func main() {
 
 	movesQueueName := "army_moves." + username
 
-	err = pubsub.SubscribeJSON(conn,routing.ExchangePerilTopic, movesQueueName, "army_moves.*", pubsub.QueueTypeTransient, handlerMove(gameState) )
+	publishCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Couldn't establish publishing channel: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(conn,routing.ExchangePerilTopic, movesQueueName, "army_moves.*", pubsub.QueueTypeTransient, handlerMove(gameState, publishCh ) )
+	if err != nil {
+		log.Fatalf("Couldn't bind queue: %v", err)
+	}
+
+	warQueueKey := routing.WarRecognitionsPrefix + ".*"
+	
+
+	err = pubsub.SubscribeJSON(conn,routing.ExchangePerilTopic, "war", warQueueKey,  pubsub.QueueTypeDurable, handlerWar(gameState))
 	if err != nil {
 		log.Fatalf("Couldn't bind queue: %v", err)
 	}

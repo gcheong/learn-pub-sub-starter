@@ -78,17 +78,17 @@ func SubscribeJSON[T any]( conn *amqp.Connection, exchange, queueName, key strin
 
 			if ackType == AckTypeAck {
 				message.Ack(false)
-				log.Printf("Acktype: %s", ackType)
+				//log.Printf("Acktype: %s", ackType)
 			}
 
 			if ackType == AckTypeNackRequeue {
 				message.Nack(false,true)
-				log.Printf("Acktype: %s", ackType)
+				//log.Printf("Acktype: %s", ackType)
 			}
 
 			if ackType == AckTypeNackDiscard {
 				message.Nack(false,false)
-				log.Printf("Acktype: %s", ackType)
+				//log.Printf("Acktype: %s", ackType)
 			}
 			
     	}
